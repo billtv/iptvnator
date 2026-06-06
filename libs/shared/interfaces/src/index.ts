@@ -15,6 +15,7 @@ export * from './lib/ipc-command.class';
 export * from './lib/ipc-commands';
 export * from './lib/language.enum';
 export * from './lib/parsed-playlist.interface';
+export * from './lib/playback-drm.interface';
 export * from './lib/playback-position.interface';
 export * from './lib/playlist-backup.interface';
 export * from './lib/playlist-meta.type';

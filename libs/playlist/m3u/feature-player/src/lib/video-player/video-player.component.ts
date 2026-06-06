@@ -205,6 +205,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
             userAgent: http['user-agent'] || undefined,
             referer: http.referrer || undefined,
             origin: http.origin || undefined,
+            manifestType: playbackTarget.manifestType,
+            drm: playbackTarget.drm,
         };
     });
     readonly sidebarStorageKey = computed(() =>

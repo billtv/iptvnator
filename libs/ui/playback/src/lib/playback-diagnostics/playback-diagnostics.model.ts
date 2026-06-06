@@ -21,6 +21,7 @@ export const PlaybackDiagnosticSource = {
     Native: 'native',
     Hls: 'hls',
     MpegTs: 'mpegts',
+    Shaka: 'shaka',
 } as const;
 
 export type PlaybackDiagnosticSource =
@@ -30,6 +31,7 @@ export const InlinePlaybackPlayer = {
     VideoJs: 'videojs',
     Html5: 'html5',
     ArtPlayer: 'artplayer',
+    Shaka: 'shaka',
 } as const;
 
 export type InlinePlaybackPlayer =

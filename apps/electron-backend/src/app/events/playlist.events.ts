@@ -6,7 +6,11 @@
 import axios from 'axios';
 import { app, dialog, ipcMain, WebContents } from 'electron';
 import { parse } from 'iptv-playlist-parser';
-import { createPlaylistObject, getFilenameFromUrl } from '@iptvnator/shared/m3u-utils';
+import {
+    createPlaylistObject,
+    getFilenameFromUrl,
+    normalizeParsedPlaylistMetadata,
+} from '@iptvnator/shared/m3u-utils';
 import { readFile, writeFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'url';
@@ -57,10 +61,12 @@ async function fetchPlaylistFromUrl(
         rejectUnauthorized: false,
     });
     const result = await axios.get(url, { httpsAgent: agent });
-    const parsedPlaylist = parse(result.data);
+    const parsedPlaylist = normalizeParsedPlaylistMetadata(
+        result.data,
+        parse(result.data)
+    );
 
-    const extractedName =
-        url && url.length > 1 ? getFilenameFromUrl(url) : '';
+    const extractedName = url && url.length > 1 ? getFilenameFromUrl(url) : '';
     const playlistName =
         !extractedName || extractedName === 'Untitled playlist'
             ? 'Imported from URL'
@@ -87,7 +93,10 @@ async function fetchPlaylistFromFile(
     title: string
 ): Promise<Playlist> {
     const fileContent = await readFile(filePath, 'utf-8');
-    const parsedPlaylist = parse(fileContent);
+    const parsedPlaylist = normalizeParsedPlaylistMetadata(
+        fileContent,
+        parse(fileContent)
+    );
     const playlistObject = createPlaylistObject(
         title,
         parsedPlaylist,
@@ -102,9 +111,8 @@ function resolvePlaylistRefreshWorker(): Worker {
         isPackaged: app.isPackaged,
         workerFilename: 'playlist-refresh.worker.js',
         developmentWorkerDir: __dirname + '/workers',
-        resourcesPath: (
-            process as NodeJS.Process & { resourcesPath?: string }
-        ).resourcesPath,
+        resourcesPath: (process as NodeJS.Process & { resourcesPath?: string })
+            .resourcesPath,
         appPath: app.getAppPath(),
     });
 
@@ -254,75 +262,83 @@ ipcMain.handle(AUTO_UPDATE_PLAYLISTS, async (event, playlists) => {
     return updatedPlaylists;
 });
 
-ipcMain.handle(PLAYLIST_REFRESH, async (event, payload: PlaylistRefreshPayload) => {
-    const worker = resolvePlaylistRefreshWorker();
+ipcMain.handle(
+    PLAYLIST_REFRESH,
+    async (event, payload: PlaylistRefreshPayload) => {
+        const worker = resolvePlaylistRefreshWorker();
 
-    return await new Promise<Playlist>((resolve, reject) => {
-        const cleanup = async (): Promise<void> => {
-            activePlaylistRefreshes.delete(payload.operationId);
-            worker.removeAllListeners();
-            await worker.terminate().catch(() => undefined);
-        };
+        return await new Promise<Playlist>((resolve, reject) => {
+            const cleanup = async (): Promise<void> => {
+                activePlaylistRefreshes.delete(payload.operationId);
+                worker.removeAllListeners();
+                await worker.terminate().catch(() => undefined);
+            };
 
-        activePlaylistRefreshes.set(payload.operationId, {
-            worker,
-            sender: event.sender,
-            resolve,
-            reject,
-        });
+            activePlaylistRefreshes.set(payload.operationId, {
+                worker,
+                sender: event.sender,
+                resolve,
+                reject,
+            });
 
-        worker.on('message', async (message: PlaylistRefreshWorkerMessage<Playlist>) => {
-            if (message.type === 'ready') {
-                worker.postMessage({
-                    type: 'request',
-                    payload,
-                });
-                return;
-            }
-
-            if (message.type === 'event') {
-                emitPlaylistRefreshEvent(event.sender, message.event);
-                return;
-            }
-
-            await cleanup();
-
-            const response = message as PlaylistRefreshWorkerResponseMessage<Playlist>;
-            if (response.success && response.result) {
-                resolve(response.result);
-                return;
-            }
-
-            reject(
-                createPlaylistRefreshError(
-                    response.error ?? {
-                        message: 'Playlist refresh worker request failed',
+            worker.on(
+                'message',
+                async (message: PlaylistRefreshWorkerMessage<Playlist>) => {
+                    if (message.type === 'ready') {
+                        worker.postMessage({
+                            type: 'request',
+                            payload,
+                        });
+                        return;
                     }
-                )
+
+                    if (message.type === 'event') {
+                        emitPlaylistRefreshEvent(event.sender, message.event);
+                        return;
+                    }
+
+                    await cleanup();
+
+                    const response =
+                        message as PlaylistRefreshWorkerResponseMessage<Playlist>;
+                    if (response.success && response.result) {
+                        resolve(response.result);
+                        return;
+                    }
+
+                    reject(
+                        createPlaylistRefreshError(
+                            response.error ?? {
+                                message:
+                                    'Playlist refresh worker request failed',
+                            }
+                        )
+                    );
+                }
             );
-        });
 
-        worker.on('error', async (error) => {
-            await cleanup();
-            reject(error);
-        });
+            worker.on('error', async (error) => {
+                await cleanup();
+                reject(error);
+            });
 
-        worker.on('exit', async (code) => {
-            if (!activePlaylistRefreshes.has(payload.operationId)) {
-                return;
-            }
+            worker.on('exit', async (code) => {
+                if (!activePlaylistRefreshes.has(payload.operationId)) {
+                    return;
+                }
 
-            await cleanup();
-            reject(
-                new Error(
-                    code === 0
-                        ? 'Playlist refresh worker exited unexpectedly'
-                        : `Playlist refresh worker stopped with exit code ${code}`
-                )
-            );
+                await cleanup();
+                reject(
+                    new Error(
+                        code === 0
+                            ? 'Playlist refresh worker exited unexpectedly'
+                            : `Playlist refresh worker stopped with exit code ${code}`
+                    )
+                );
+            });
         });
-    });
-});
+    }
+);
 
 ipcMain.handle(
     PLAYLIST_CANCEL_REFRESH,
@@ -345,9 +361,7 @@ ipcMain.handle('save-file-dialog', async (event, defaultPath, filters) => {
     try {
         const { canceled, filePath } = await dialog.showSaveDialog({
             defaultPath,
-            filters: filters || [
-                { name: 'All Files', extensions: ['*'] },
-            ],
+            filters: filters || [{ name: 'All Files', extensions: ['*'] }],
         });
 
         if (canceled || !filePath) {

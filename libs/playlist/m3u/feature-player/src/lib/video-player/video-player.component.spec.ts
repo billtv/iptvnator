@@ -430,6 +430,31 @@ describe('VideoPlayerComponent', () => {
         expect(headerContext.action()).toBeNull();
     });
 
+    it('preserves manifest and DRM metadata in embedded playback', () => {
+        const drmChannel: Channel = {
+            ...sampleChannel,
+            url: 'https://example.test/master.mpd',
+            manifestType: 'dash',
+            drm: {
+                type: 'clearkey',
+                clearKeys: {
+                    '00112233445566778899aabbccddeeff':
+                        'ffeeddccbbaa99887766554433221100',
+                },
+            },
+        };
+        syncStoreState(drmChannel);
+        fixture.detectChanges();
+
+        expect(component.embeddedPlayback()).toEqual(
+            expect.objectContaining({
+                streamUrl: drmChannel.url,
+                manifestType: 'dash',
+                drm: drmChannel.drm,
+            })
+        );
+    });
+
     it('renders the inline player with the embedded EPG panel', () => {
         syncStoreState(sampleChannel);
         player.set(VideoPlayer.VideoJs);

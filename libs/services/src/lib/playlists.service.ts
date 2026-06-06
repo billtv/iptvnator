@@ -5,6 +5,7 @@ import {
     aggregateFavoriteChannels,
     createFavoritesPlaylist,
     createPlaylistObject,
+    normalizeParsedPlaylistMetadata,
 } from '@iptvnator/shared/m3u-utils';
 import { NgxIndexedDBService } from 'ngx-indexed-db';
 import {
@@ -821,7 +822,10 @@ export class PlaylistsService {
             // on user-triggered imports.
             const parserModule = await import('iptv-playlist-parser');
             const parse = resolvePlaylistParser(parserModule);
-            const parsedPlaylist = parse(playlist);
+            const parsedPlaylist = normalizeParsedPlaylistMetadata(
+                playlist,
+                parse(playlist)
+            );
             return createPlaylistObject(
                 title,
                 parsedPlaylist,

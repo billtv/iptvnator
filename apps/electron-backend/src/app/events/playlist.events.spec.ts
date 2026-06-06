@@ -70,6 +70,10 @@ jest.mock('@iptvnator/shared/m3u-utils', () => ({
     createPlaylistObject: (...args: unknown[]) =>
         mockCreatePlaylistObject(...args),
     getFilenameFromUrl: (...args: unknown[]) => mockGetFilenameFromUrl(...args),
+    normalizeParsedPlaylistMetadata: (
+        _rawPlaylist: string,
+        parsedPlaylist: unknown
+    ) => parsedPlaylist,
 }));
 
 jest.mock('node:fs/promises', () => ({

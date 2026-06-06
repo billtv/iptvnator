@@ -151,6 +151,9 @@ importers:
       semver:
         specifier: 7.7.3
         version: 7.7.3
+      shaka-player:
+        specifier: 5.1.7
+        version: 5.1.7
       uuid:
         specifier: 9.0.0
         version: 9.0.0
@@ -10688,6 +10691,10 @@ packages:
 
   setprototypeof@1.2.0:
     resolution: {integrity: sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw==}
+
+  shaka-player@5.1.7:
+    resolution: {integrity: sha512-NVWsrJlwsefAwLgd5N8e2rOOflZuTqW3YOxsJyW/iv/uaE1Ao7eiF5UZBoYx7ZVP4uWfHLA3RMJa1gFHHkwZVg==}
+    engines: {node: '>=18'}
 
   shallow-clone@3.0.1:
     resolution: {integrity: sha512-/6KqX+GVUdqPuPPd2LxDDxzX6CAbjJehAAOKlNpqqUpAqPM6HeL8f+o3a+JsyGjn2lv0WY8UsTgUJjU9Ok55NA==}
@@ -24518,6 +24525,8 @@ snapshots:
   setprototypeof@1.1.0: {}
 
   setprototypeof@1.2.0: {}
+
+  shaka-player@5.1.7: {}
 
   shallow-clone@3.0.1:
     dependencies:

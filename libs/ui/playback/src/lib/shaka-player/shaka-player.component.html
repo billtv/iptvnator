@@ -1,0 +1,36 @@
+<video #videoPlayer autoplay controls playsinline></video>
+
+@if (audioTracks.length > 1 || textTracks.length > 0) {
+    <div class="shaka-track-controls">
+        @if (audioTracks.length > 1) {
+            <label>
+                <span>Audio</span>
+                <select
+                    aria-label="Audio track"
+                    [value]="selectedAudioTrack"
+                    (change)="selectAudioTrack($any($event.target).value)"
+                >
+                    @for (track of audioTracks; track track.index) {
+                        <option [value]="track.index">{{ track.label }}</option>
+                    }
+                </select>
+            </label>
+        }
+
+        @if (textTracks.length > 0) {
+            <label>
+                <span>Subtitles</span>
+                <select
+                    aria-label="Subtitle track"
+                    [value]="selectedTextTrack"
+                    (change)="selectTextTrack($any($event.target).value)"
+                >
+                    <option value="-1">Off</option>
+                    @for (track of textTracks; track track.id) {
+                        <option [value]="track.id">{{ track.label }}</option>
+                    }
+                </select>
+            </label>
+        }
+    </div>
+}

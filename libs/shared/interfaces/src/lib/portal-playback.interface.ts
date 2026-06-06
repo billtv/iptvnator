@@ -1,4 +1,8 @@
 import { PlaybackPositionData } from './playback-position.interface';
+import type {
+    PlaybackDrmConfiguration,
+    PlaybackManifestType,
+} from './playback-drm.interface';
 
 export interface PlayerContentInfo extends Omit<
     PlaybackPositionData,
@@ -18,4 +22,6 @@ export interface ResolvedPortalPlayback {
     userAgent?: string;
     referer?: string;
     origin?: string;
+    manifestType?: PlaybackManifestType;
+    drm?: PlaybackDrmConfiguration;
 }

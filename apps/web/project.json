@@ -36,6 +36,7 @@
                 "allowedCommonJsDependencies": [
                     "qrcode",
                     "iptv-playlist-parser",
+                    "shaka-player",
                     "mpegts.js",
                     "videojs-contrib-quality-levels",
                     "videojs-quality-selector-hls",

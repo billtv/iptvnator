@@ -1,3 +1,8 @@
+import type {
+    PlaybackDrmConfiguration,
+    PlaybackManifestType,
+} from './playback-drm.interface';
+
 export interface ParsedPlaylist {
     header: {
         attrs: {
@@ -33,4 +38,6 @@ export interface ParsedPlaylistItem {
     };
     timeshift?: string;
     radio?: string;
+    manifestType?: PlaybackManifestType;
+    drm?: PlaybackDrmConfiguration;
 }

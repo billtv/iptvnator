@@ -7,6 +7,7 @@ import zlib from 'node:zlib';
 import axios from 'axios';
 import epgParser from 'epg-parser';
 import parser from 'iptv-playlist-parser';
+import { normalizeParsedPlaylistMetadata } from '@iptvnator/shared/m3u-utils';
 
 export interface WebBackendHttpGetOptions {
     readonly headers?: Record<string, string>;
@@ -454,7 +455,10 @@ function isPlaylistParseError(
 function parsePlaylist(playlist: string): {
     items: Array<Record<string, unknown>>;
 } {
-    return parser.parse(playlist) as unknown as {
+    return normalizeParsedPlaylistMetadata(
+        playlist,
+        parser.parse(playlist)
+    ) as unknown as {
         items: Array<Record<string, unknown>>;
     };
 }

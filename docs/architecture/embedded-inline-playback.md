@@ -20,6 +20,8 @@ This document records the current contract for embedded playback in portal detai
 - Embedded playback UI is always hosted by the current view. `PlayerService`
   launches MPV/VLC only and does not open an embedded-player dialog.
 - Browser-player failures are diagnosed client-side and can offer explicit MPV/VLC fallback actions without changing the saved player setting.
+- ClearKey DASH items use Shaka Player as a lazy-loaded playback engine without
+  adding another user-facing player setting.
 
 ## Scope
 
@@ -113,6 +115,24 @@ When a detail view starts playback:
 
 The detail or collection/search host owns inline state. `PlayerService` is not
 an owner of embedded UI playback state.
+
+### ClearKey DASH
+
+`WebPlayerViewComponent` routes a playback payload to Shaka only when:
+
+- the selected player is one of the embedded web players
+- `drm.type` is `clearkey`
+- the payload declares DASH or its URL ends in `.mpd`
+
+Ordinary HLS, MPEG-TS, MP4, portal, embedded MPV, and external MPV/VLC playback
+keep their existing paths. Shaka is dynamically imported, configures
+`drm.clearKeys`, and is the sole MediaSource/EME owner for the DRM item. The
+DRM media component uses native controls and exposes audio and subtitle
+selectors only when the manifest provides those tracks.
+
+Shaka teardown always unloads the current asset, unregisters request filters,
+and destroys the player. Diagnostic details contain only Shaka category/code
+identifiers and never include configured keys or error payload data.
 
 ## Series Quick Start CTA
 
@@ -237,6 +257,8 @@ Types introduced:
 
 - `PlayerContentInfo`
 - `ResolvedPortalPlayback`
+- `PlaybackDrmConfiguration`
+- `PlaybackManifestType`
 
 These provide a single shape for:
 
@@ -245,6 +267,7 @@ These provide a single shape for:
 - optional thumbnail and resume start time
 - playback-position metadata
 - optional external-player headers and request metadata
+- optional normalized DRM and manifest metadata
 
 ## Xtream Behavior
 

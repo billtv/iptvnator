@@ -1,4 +1,13 @@
-@if (player === 'videojs') {
+@if (shouldUseShaka()) {
+    <app-shaka-player
+        [playback]="resolvedPlayback()"
+        [volume]="volume()"
+        [showCaptions]="showCaptions()"
+        [startTime]="startTime()"
+        (timeUpdate)="timeUpdate.emit($event)"
+        (playbackIssue)="handlePlaybackIssue($event)"
+    />
+} @else if (player === 'videojs') {
     <app-vjs-player
         [options]="vjsOptions"
         [volume]="volume()"

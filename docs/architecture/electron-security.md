@@ -75,6 +75,20 @@ the PWA/electron build configurations. Playback-heavy changes should also check
 that HLS, MPEG-TS, thumbnails, and local file playback are still allowed by the
 policy.
 
+## EME And ClearKey
+
+Shaka Player is bundled locally and loaded only for supported ClearKey DASH
+payloads. Development playback runs on the trustworthy
+`http://localhost:4200` origin. The implementation does not change
+`webSecurity`, sandboxing, context isolation, Node integration, navigation
+allow-lists, certificate validation, or CSP.
+
+Inline keys are normalized during M3U import and passed only to Shaka's
+`drm.clearKeys` configuration. They must not be written to logs, diagnostics,
+analytics, clipboard helpers, or external-player arguments. Electron continues
+to own forbidden browser headers such as `User-Agent`, `Referer`, and `Origin`;
+Shaka request filters apply only browser-settable application headers.
+
 ## Scoped Request Header Overrides
 
 Inline playback can request temporary `User-Agent`, `Referer`, and `Origin`

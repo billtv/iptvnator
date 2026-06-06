@@ -37,6 +37,8 @@ import {
     getPlaybackMediaExtensionFromUrl,
 } from '../playback-diagnostics/playback-diagnostics.util';
 import { VjsPlayerComponent } from '../vjs-player/vjs-player.component';
+import { isSupportedClearKeyPlayback } from '../shaka-player/clear-key-playback.util';
+import { ShakaPlayerComponent } from '../shaka-player/shaka-player.component';
 
 type PlaybackDiagnosticDetail = {
     readonly labelKey: string;
@@ -58,6 +60,7 @@ type PlaybackDiagnosticDetail = {
         MatButtonModule,
         MatIconModule,
         MatTooltipModule,
+        ShakaPlayerComponent,
         TranslatePipe,
         VjsPlayerComponent,
     ],
@@ -122,6 +125,12 @@ export class WebPlayerViewComponent {
             this.settings()?.player ??
             VideoPlayer.VideoJs
     );
+    readonly shouldUseShaka = computed(() =>
+        isSupportedClearKeyPlayback(
+            this.resolvedPlayback(),
+            this.selectedPlayer()
+        )
+    );
     readonly recordingFolder = computed(
         () => this.settings()?.recordingFolder ?? ''
     );
@@ -143,11 +152,13 @@ export class WebPlayerViewComponent {
     setVjsOptions(streamUrl: string, isLive = true) {
         const extension = getPlaybackMediaExtensionFromUrl(streamUrl);
         const mimeType =
-            extension === 'm3u' || extension === 'm3u8'
-                ? 'application/x-mpegURL'
-                : extension === 'ts' || !extension
-                  ? 'video/mp2t'
-                  : 'video/mp4';
+            extension === 'mpd'
+                ? 'application/dash+xml'
+                : extension === 'm3u' || extension === 'm3u8'
+                  ? 'application/x-mpegURL'
+                  : extension === 'ts' || !extension
+                    ? 'video/mp2t'
+                    : 'video/mp4';
 
         this.vjsOptions = {
             isLive,
@@ -192,6 +203,8 @@ export class WebPlayerViewComponent {
                     '',
             },
             radio: 'false',
+            manifestType: playback.manifestType,
+            drm: playback.drm,
         };
     }
 
@@ -346,6 +359,8 @@ export class WebPlayerViewComponent {
                 return 'HTML5';
             case 'artplayer':
                 return 'ArtPlayer';
+            case 'shaka':
+                return 'Shaka Player';
             default:
                 return '';
         }
@@ -363,6 +378,8 @@ export class WebPlayerViewComponent {
                 return 'Native media element';
             case 'source':
                 return 'Stream metadata';
+            case 'shaka':
+                return 'Shaka Player';
             default:
                 return source;
         }

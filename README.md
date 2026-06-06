@@ -21,6 +21,11 @@ The application is a cross-platform, open-source project built with Electron and
 
 ## Features
 
+- MPEG-DASH ClearKey playback from Kodi-style M3U `#KODIPROP` metadata, with
+  audio-track and subtitle selection when provided by the stream
+- Automatic XMLTV import from quoted or unquoted M3U `x-tvg-url`/`url-tvg`
+  headers
+
 - M3u and M3u8 playlist support 📺
 - Radio playlist support with dedicated audio player 📻
 - Xtream Code (XC) and Stalker portal (STB) support

@@ -1,3 +1,8 @@
+import type {
+    PlaybackDrmConfiguration,
+    PlaybackManifestType,
+} from './playback-drm.interface';
+
 /**
  * Represents channel object
  * TODO: define channel interface in iptv-parser library
@@ -29,4 +34,6 @@ export interface Channel {
         origin: string;
     };
     radio: string;
+    manifestType?: PlaybackManifestType;
+    drm?: PlaybackDrmConfiguration;
 }

@@ -18,7 +18,11 @@ import {
     tap,
     withLatestFrom,
 } from 'rxjs';
-import { DataService, PlaylistsService } from '@iptvnator/services';
+import {
+    DataService,
+    PlaylistsService,
+    SettingsStore,
+} from '@iptvnator/services';
 import {
     OPEN_MPV_PLAYER,
     OPEN_VLC_PLAYER,
@@ -41,6 +45,10 @@ import {
 } from './selectors';
 import { resolveChannelEpgLookupKey } from './channel-epg-lookup.util';
 import { buildExternalPlayerPayload } from './external-player-payload.util';
+import {
+    getPlaylistEpgUrl,
+    mergePlaylistEpgUrls,
+} from './playlist-epg-url.util';
 
 @Injectable({ providedIn: 'any' })
 export class PlaylistEffects {
@@ -51,6 +59,7 @@ export class PlaylistEffects {
     private router = inject(Router);
     private snackBar = inject(MatSnackBar);
     private storage = inject(StorageMap);
+    private settingsStore = inject(SettingsStore);
     private store = inject(Store);
     private translate = inject(TranslateService);
 
@@ -320,6 +329,7 @@ export class PlaylistEffects {
                         return;
                     }
 
+                    void this.registerPlaylistEpgUrl(action.playlist);
                     this.navigateToPlaylist(action.playlist);
                 }),
                 switchMap((action) => {
@@ -423,5 +433,19 @@ export class PlaylistEffects {
         }
 
         void this.router.navigate(['/workspace', 'playlists', playlist._id]);
+    }
+
+    private async registerPlaylistEpgUrl(playlist: Playlist): Promise<void> {
+        if (!getPlaylistEpgUrl(playlist)) {
+            return;
+        }
+
+        const currentUrls = this.settingsStore.getSettings().epgUrl ?? [];
+        const mergedUrls = mergePlaylistEpgUrls(playlist, currentUrls);
+        if (mergedUrls.length !== currentUrls.length) {
+            await this.settingsStore.updateSettings({ epgUrl: mergedUrls });
+        }
+
+        this.epgService.fetchEpg(mergedUrls);
     }
 }

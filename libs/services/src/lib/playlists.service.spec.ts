@@ -71,6 +71,38 @@ describe('PlaylistsService', () => {
         ).toBe(parse);
     });
 
+    it('normalizes pre-EXTINF ClearKey and unquoted EPG metadata during import', async () => {
+        const service = createService();
+        const keyId = '00112233445566778899aabbccddeeff';
+        const contentKey = 'ffeeddccbbaa99887766554433221100';
+        const rawPlaylist = `#EXTM3U x-tvg-url=https://example.test/guide.xml
+#KODIPROP:inputstreamaddon=inputstream.adaptive
+#KODIPROP:inputstream.adaptive.manifest_type=mpd
+#KODIPROP:inputstream.adaptive.license_type=clearkey
+#KODIPROP:inputstream.adaptive.license_key=${keyId}:${contentKey}
+#EXTINF:-1 tvg-name="HBO",HBO
+https://example.test/master.mpd`;
+
+        const playlist = await service.handlePlaylistParsing(
+            'TEXT',
+            rawPlaylist,
+            'ClearKey'
+        );
+
+        expect(playlist.playlist.header.attrs['x-tvg-url']).toBe(
+            'https://example.test/guide.xml'
+        );
+        expect(playlist.playlist.items[0]).toEqual(
+            expect.objectContaining({
+                manifestType: 'dash',
+                drm: {
+                    type: 'clearkey',
+                    clearKeys: { [keyId]: contentKey },
+                },
+            })
+        );
+    });
+
     it('runs registered cleanup hooks after deleting a browser playlist', async () => {
         const cleanup = jest.fn().mockResolvedValue(undefined);
         const deleteFromIndexedDb = jest.fn(() => of(undefined));

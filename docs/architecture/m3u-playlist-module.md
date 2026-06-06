@@ -13,6 +13,26 @@ The M3U playlist module provides:
 - Per-playlist group visibility management in the groups view
 - Video playback with multiple player backends
 
+## Playlist Metadata Normalization
+
+All M3U import paths retain the original playlist text and normalize metadata
+after `iptv-playlist-parser` runs. The repository-owned normalizer in
+`libs/shared/m3u-utils/src/lib/kodi-playback-properties.util.ts`:
+
+- accepts quoted and unquoted `x-tvg-url` and `url-tvg` header values
+- associates `#KODIPROP` lines before or after `#EXTINF` with the correct item
+- normalizes `mpd`/`dash` and `m3u8`/`hls` manifest declarations
+- validates lowercase 32-hex ClearKey KID/key mappings without logging keys
+- clears pending properties after each channel URL to prevent metadata leakage
+
+The normalized optional `manifestType` and `drm` fields are preserved through
+playlist persistence, channel selection, catchup URL substitution, favorites,
+recent items, and the shared playback payload.
+
+When an imported playlist header declares an EPG URL, the M3U add-playlist
+effect merges it into the existing EPG URL settings and starts an EPG import.
+User-configured URLs are preserved and duplicate URLs are removed.
+
 ## Module Structure
 
 ```
