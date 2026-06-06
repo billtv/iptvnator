@@ -38,7 +38,10 @@ export class ShakaPlaybackAdapter {
         | ((type: number, request: { headers: Record<string, string> }) => void)
         | null = null;
 
-    async attach(video: HTMLVideoElement): Promise<void> {
+    async attach(
+        video: HTMLVideoElement,
+        videoContainer: HTMLElement
+    ): Promise<void> {
         if (this.player && this.video === video) {
             return;
         }
@@ -47,6 +50,7 @@ export class ShakaPlaybackAdapter {
         const shaka = await loadShakaPlayer();
         this.video = video;
         this.player = new shaka.Player(video);
+        this.player.setVideoContainer(videoContainer);
     }
 
     async load(request: ShakaPlaybackRequest): Promise<void> {

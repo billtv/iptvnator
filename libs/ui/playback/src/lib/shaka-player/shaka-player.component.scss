@@ -13,10 +13,19 @@ video {
     object-fit: contain;
 }
 
+:host ::ng-deep .shaka-text-container {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    overflow: hidden;
+}
+
 .shaka-track-controls {
     position: absolute;
     top: 12px;
     right: 12px;
+    z-index: 2;
     display: flex;
     gap: 8px;
     padding: 8px;

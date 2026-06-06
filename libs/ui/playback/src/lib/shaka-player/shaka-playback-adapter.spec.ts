@@ -10,6 +10,7 @@ class MockPlayer {
     getTextTracks = jest.fn(() => []);
     selectAudioTrack = jest.fn();
     selectTextTrack = jest.fn();
+    setVideoContainer = jest.fn();
     addEventListener = jest.fn();
     removeEventListener = jest.fn();
     networkingEngine = {
@@ -49,7 +50,9 @@ describe('ShakaPlaybackAdapter', () => {
         const adapter = new ShakaPlaybackAdapter();
         const video = document.createElement('video');
         video.play = jest.fn(async () => undefined);
-        await adapter.attach(video);
+        const container = document.createElement('div');
+        container.appendChild(video);
+        await adapter.attach(video, container);
 
         const request = {
             streamUrl: 'https://example.test/master.mpd',
@@ -69,6 +72,7 @@ describe('ShakaPlaybackAdapter', () => {
 
         const player = playerInstances[0];
         expect(installAll).toHaveBeenCalledTimes(1);
+        expect(player.setVideoContainer).toHaveBeenCalledWith(container);
         expect(player.configure).toHaveBeenCalledWith({
             drm: {
                 clearKeys: request.drm.clearKeys,
@@ -89,7 +93,10 @@ describe('ShakaPlaybackAdapter', () => {
         const { ShakaPlaybackAdapter } =
             await import('./shaka-playback-adapter');
         const adapter = new ShakaPlaybackAdapter();
-        await adapter.attach(document.createElement('video'));
+        const video = document.createElement('video');
+        const container = document.createElement('div');
+        container.appendChild(video);
+        await adapter.attach(video, container);
 
         await expect(
             adapter.load({

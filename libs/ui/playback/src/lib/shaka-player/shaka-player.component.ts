@@ -9,6 +9,7 @@ import {
     Output,
     SimpleChanges,
     ViewChild,
+    inject,
 } from '@angular/core';
 import type { ResolvedPortalPlayback } from '@iptvnator/shared/interfaces';
 import type { PlaybackDiagnostic } from '../playback-diagnostics/playback-diagnostics.util';
@@ -45,6 +46,7 @@ export class ShakaPlayerComponent implements OnInit, OnChanges, OnDestroy {
     selectedTextTrack = -1;
 
     private readonly adapter = new ShakaPlaybackAdapter();
+    private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
     private initialized = false;
     private loadGeneration = 0;
 
@@ -68,7 +70,7 @@ export class ShakaPlayerComponent implements OnInit, OnChanges, OnDestroy {
         const video = this.videoPlayer.nativeElement;
         video.addEventListener('timeupdate', this.handleTimeUpdate);
         video.addEventListener('playing', this.handlePlaying);
-        await this.adapter.attach(video);
+        await this.adapter.attach(video, this.host.nativeElement);
         this.adapter.addEventListener('error', this.handleShakaError);
         this.initialized = true;
         await this.loadPlayback();
