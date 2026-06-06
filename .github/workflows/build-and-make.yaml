@@ -19,20 +19,8 @@ jobs:
         strategy:
             matrix:
                 include:
-                    # macOS builds - separate runners to avoid native module conflicts
-                    - os: macos
-                      runner: macos-15-intel
-                      arch: x64
-                    - os: macos
-                      runner: macos-latest
-                      arch: arm64
-                    # Linux and Windows
-                    - os: linux
-                      runner: ubuntu-22.04
-                      linux_profile: standard
-                    - os: linux
-                      runner: ubuntu-24.04
-                      linux_profile: flatpak
+                    # This fork only publishes unsigned Windows artifacts.
+                    # macOS packaging requires upstream signing and notarization secrets.
                     - os: windows
                       runner: windows-latest
 
