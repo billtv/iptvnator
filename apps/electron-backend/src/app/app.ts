@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, screen, shell } from 'electron';
+import { app, BrowserWindow, Menu, screen, session, shell } from 'electron';
 import { join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { rendererAppName, rendererAppPort } from './constants';
@@ -85,6 +85,21 @@ export function getMainWindowWebPreferences(): Electron.BrowserWindowConstructor
         backgroundThrottling: false,
         preload: join(__dirname, 'main.preload.js'),
     };
+}
+
+export async function clearLegacyServiceWorkers(
+    electronSession: Pick<
+        Electron.Session,
+        'clearStorageData'
+    > = session.defaultSession
+): Promise<void> {
+    try {
+        await electronSession.clearStorageData({
+            storages: ['serviceworkers'],
+        });
+    } catch (error) {
+        console.warn('Failed to clear legacy Electron service workers:', error);
+    }
 }
 
 function attachWindowTrace(mainWindow: Electron.BrowserWindow): void {
@@ -204,11 +219,12 @@ export default class App {
         App.mainWindow = null;
     }
 
-    private static onReady() {
+    private static async onReady() {
         // This method will be called when Electron has finished
         // initialization and is ready to create browser windows.
         // Some APIs can only be used after this event occurs.
         if (rendererAppName) {
+            await clearLegacyServiceWorkers();
             App.initMainWindow();
             App.loadMainWindow();
         }

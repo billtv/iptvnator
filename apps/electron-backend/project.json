@@ -27,7 +27,11 @@
                 "electron-backend:build-worker",
                 "electron-backend:build-embedded-mpv",
                 {
-                    "projects": ["web", "remote-control-web"],
+                    "projects": ["web"],
+                    "target": "build-electron"
+                },
+                {
+                    "projects": ["remote-control-web"],
                     "target": "build"
                 }
             ],

@@ -10,6 +10,11 @@ jest.mock('electron', () => ({
     screen: {
         getPrimaryDisplay: jest.fn(),
     },
+    session: {
+        defaultSession: {
+            clearStorageData: jest.fn(),
+        },
+    },
     shell: {
         openExternal: jest.fn(),
     },
@@ -24,12 +29,39 @@ jest.mock('./services/store.service', () => ({
 }));
 
 import {
+    clearLegacyServiceWorkers,
     getMainWindowWebPreferences,
     isExternalBrowserUrl,
     isTrustedRendererNavigationUrl,
 } from './app';
 
 describe('Electron app security helpers', () => {
+    it('clears only legacy service worker registrations', async () => {
+        const clearStorageData = jest.fn().mockResolvedValue(undefined);
+
+        await clearLegacyServiceWorkers({ clearStorageData });
+
+        expect(clearStorageData).toHaveBeenCalledWith({
+            storages: ['serviceworkers'],
+        });
+    });
+
+    it('continues startup when legacy service worker cleanup fails', async () => {
+        const error = new Error('cleanup failed');
+        const clearStorageData = jest.fn().mockRejectedValue(error);
+        const warn = jest.spyOn(console, 'warn').mockImplementation();
+
+        await expect(
+            clearLegacyServiceWorkers({ clearStorageData })
+        ).resolves.toBeUndefined();
+        expect(warn).toHaveBeenCalledWith(
+            'Failed to clear legacy Electron service workers:',
+            error
+        );
+
+        warn.mockRestore();
+    });
+
     it('creates an explicitly hardened BrowserWindow webPreferences object', () => {
         expect(getMainWindowWebPreferences()).toEqual(
             expect.objectContaining({

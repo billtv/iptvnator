@@ -117,6 +117,38 @@
                         }
                     ]
                 },
+                "electron": {
+                    "baseHref": "./",
+                    "serviceWorker": false,
+                    "budgets": [
+                        {
+                            "type": "initial",
+                            "maximumWarning": "4.5mb",
+                            "maximumError": "5mb"
+                        },
+                        {
+                            "type": "anyComponentStyle",
+                            "maximumWarning": "12.5kb",
+                            "maximumError": "15kb"
+                        }
+                    ],
+                    "optimization": {
+                        "scripts": true,
+                        "styles": {
+                            "minify": true,
+                            "inlineCritical": false,
+                            "removeSpecialComments": true
+                        },
+                        "fonts": true
+                    },
+                    "outputHashing": "all",
+                    "fileReplacements": [
+                        {
+                            "replace": "apps/web/src/environments/environment.ts",
+                            "with": "apps/web/src/environments/environment.prod.ts"
+                        }
+                    ]
+                },
                 "development": {
                     "serviceWorker": false,
                     "optimization": false,
@@ -132,6 +164,12 @@
                 }
             },
             "defaultConfiguration": "production"
+        },
+        "build-electron": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "pnpm nx run web:build:electron"
+            }
         },
         "build-e2e": {
             "executor": "nx:run-commands",

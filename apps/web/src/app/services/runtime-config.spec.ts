@@ -25,15 +25,32 @@ describe('runtime config helpers', () => {
         ).toBe('https://fallback.example');
     });
 
-    it('enables service worker only for production builds with browser support', () => {
+    it('enables service worker only for production browser builds with support', () => {
         expect(
-            shouldEnableServiceWorker(true, {
-                serviceWorker: {},
-            } as Navigator)
+            shouldEnableServiceWorker(
+                true,
+                {
+                    serviceWorker: {},
+                } as Navigator,
+                null
+            )
         ).toBe(true);
         expect(
-            shouldEnableServiceWorker(false, { serviceWorker: {} } as Navigator)
+            shouldEnableServiceWorker(
+                false,
+                { serviceWorker: {} } as Navigator,
+                null
+            )
         ).toBe(false);
-        expect(shouldEnableServiceWorker(true, {} as Navigator)).toBe(false);
+        expect(shouldEnableServiceWorker(true, {} as Navigator, null)).toBe(
+            false
+        );
+        expect(
+            shouldEnableServiceWorker(
+                true,
+                { serviceWorker: {} } as Navigator,
+                {}
+            )
+        ).toBe(false);
     });
 });

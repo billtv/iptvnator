@@ -40,6 +40,11 @@ The build must emit these files in `dist/apps/web`:
 - `safety-worker.js`
 - `worker-basic.min.js`
 
+Electron uses `web:build-electron`, which keeps the production optimizations
+but disables service worker output and registration. The Electron main process
+also clears legacy service worker registrations before loading the packaged
+renderer so upgrades recover installations affected by older builds.
+
 Angular also emits hashed font and media assets under `dist/apps/web/media/`.
 Keep `/media/**` in `ngsw-config.json` so the PWA service worker can cache
 bundled fonts, including Material Icons.
