@@ -221,21 +221,83 @@ describe('playlist IPC events', () => {
     });
 
     it('rejects HTML challenge pages instead of parsing them as playlists', async () => {
-        mockSessionFetch.mockResolvedValue(
-            new Response('<!DOCTYPE html><title>Just a moment...</title>', {
-                headers: { 'content-type': 'text/html; charset=UTF-8' },
-            })
-        );
+        mockSessionFetch
+            .mockResolvedValueOnce(
+                new Response(
+                    '<!DOCTYPE html><title>Just a moment...</title><script src="/cdn-cgi/challenge-platform"></script>',
+                    {
+                        status: 403,
+                        headers: {
+                            'cf-mitigated': 'challenge',
+                            'content-type': 'text/html; charset=UTF-8',
+                        },
+                    }
+                )
+            )
+            .mockResolvedValueOnce(
+                new Response('<!DOCTYPE html><title>Still blocked</title>', {
+                    status: 403,
+                    headers: { 'content-type': 'text/html; charset=UTF-8' },
+                })
+            );
 
         await expect(
             getHandler('fetch-playlist-by-url')(
                 createIpcEvent(),
                 'https://example.test/challenge.m3u'
             )
-        ).rejects.toThrow(
-            'The playlist URL returned an HTML page instead of M3U content'
-        );
+        ).rejects.toThrow('Request failed with status code 403');
         expect(mockParse).not.toHaveBeenCalled();
+    });
+
+    it('retries Cloudflare challenges with a compatible browser user agent', async () => {
+        const parsedPlaylist = { items: [{ name: 'News' }] };
+        const playlist = createPlaylist({
+            title: 'remote.m3u',
+            url: 'https://example.test/remote.m3u',
+        });
+        mockSessionFetch
+            .mockResolvedValueOnce(
+                new Response(
+                    '<!DOCTYPE html><title>Just a moment...</title><script>window._cf_chl_opt={}</script>',
+                    {
+                        status: 403,
+                        headers: {
+                            'cf-mitigated': 'challenge',
+                            'content-type': 'text/html; charset=UTF-8',
+                        },
+                    }
+                )
+            )
+            .mockResolvedValueOnce(
+                new Response('#EXTM3U', {
+                    headers: {
+                        'content-type': 'application/vnd.apple.mpegurl',
+                    },
+                })
+            );
+        mockParse.mockReturnValue(parsedPlaylist);
+        mockGetFilenameFromUrl.mockReturnValue('remote.m3u');
+        mockCreatePlaylistObject.mockReturnValue(playlist);
+
+        await expect(
+            getHandler('fetch-playlist-by-url')(
+                createIpcEvent(),
+                'https://example.test/remote.m3u'
+            )
+        ).resolves.toEqual(playlist);
+
+        expect(mockSessionFetch).toHaveBeenNthCalledWith(
+            2,
+            'https://example.test/remote.m3u',
+            expect.objectContaining({
+                headers: expect.objectContaining({
+                    'User-Agent': expect.stringContaining(
+                        'Chrome/137.0.0.0'
+                    ),
+                }),
+            })
+        );
     });
 
     it('returns null when the open playlist dialog is cancelled', async () => {

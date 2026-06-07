@@ -124,7 +124,7 @@ describe('ShakaPlaybackAdapter', () => {
         expect(video.volume).toBe(0.5);
     });
 
-    it('switches subtitle output between the UI overlay and native presentation tracks', async () => {
+    it('replaces the Shaka text displayer for native picture-in-picture', async () => {
         const { ShakaPlaybackAdapter } =
             await import('./shaka-playback-adapter');
         const adapter = new ShakaPlaybackAdapter();
@@ -133,20 +133,11 @@ describe('ShakaPlaybackAdapter', () => {
         container.appendChild(video);
         await adapter.attach(video, container);
 
-        const textDisplayFactory = playerInstances[0].configure.mock.calls[0][0]
-            .textDisplayFactory as () => {
-            setTextVisibility(visible: boolean): void;
-            destroy(): Promise<void>;
-        };
-        const displayer = textDisplayFactory();
-        displayer.setTextVisibility(true);
-
-        expect(uiTextDisplayers[0].setTextVisibility).toHaveBeenLastCalledWith(
-            true
+        const inlineFactory = playerInstances[0].configure.mock.calls[0][0]
+            .textDisplayFactory as (player: MockPlayer) => MockTextDisplayer;
+        expect(inlineFactory(playerInstances[0])).toBeInstanceOf(
+            MockUiTextDisplayer
         );
-        expect(
-            nativeTextDisplayers[0].setTextVisibility
-        ).toHaveBeenLastCalledWith(false);
 
         Object.defineProperty(document, 'pictureInPictureElement', {
             configurable: true,
@@ -154,18 +145,44 @@ describe('ShakaPlaybackAdapter', () => {
         });
         video.dispatchEvent(new Event('enterpictureinpicture'));
 
-        expect(
-            nativeTextDisplayers[0].setTextVisibility
-        ).toHaveBeenLastCalledWith(true);
-        expect(uiTextDisplayers[0].setTextVisibility).toHaveBeenLastCalledWith(
-            false
+        const nativeFactory = playerInstances[0].configure.mock.calls[1][0]
+            .textDisplayFactory as (player: MockPlayer) => MockTextDisplayer;
+        expect(nativeFactory(playerInstances[0])).toBeInstanceOf(
+            MockNativeTextDisplayer
         );
 
-        await displayer.destroy();
         Object.defineProperty(document, 'pictureInPictureElement', {
             configurable: true,
             value: null,
         });
+        video.dispatchEvent(new Event('leavepictureinpicture'));
+
+        const restoredFactory = playerInstances[0].configure.mock.calls[2][0]
+            .textDisplayFactory as (player: MockPlayer) => MockTextDisplayer;
+        expect(restoredFactory(playerInstances[0])).toBeInstanceOf(
+            MockUiTextDisplayer
+        );
+    });
+
+    it('uses native text tracks for WebKit native fullscreen', async () => {
+        const { ShakaPlaybackAdapter } =
+            await import('./shaka-playback-adapter');
+        const adapter = new ShakaPlaybackAdapter();
+        const video = document.createElement('video') as HTMLVideoElement & {
+            webkitDisplayingFullscreen?: boolean;
+        };
+        const container = document.createElement('div');
+        container.appendChild(video);
+        await adapter.attach(video, container);
+
+        video.webkitDisplayingFullscreen = true;
+        video.dispatchEvent(new Event('webkitbeginfullscreen'));
+
+        const nativeFactory = playerInstances[0].configure.mock.calls[1][0]
+            .textDisplayFactory as (player: MockPlayer) => MockTextDisplayer;
+        expect(nativeFactory(playerInstances[0])).toBeInstanceOf(
+            MockNativeTextDisplayer
+        );
     });
 
     it('rejects explicit ClearKey metadata without a valid key', async () => {

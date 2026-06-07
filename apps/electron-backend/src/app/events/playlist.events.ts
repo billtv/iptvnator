@@ -43,6 +43,10 @@ type ActivePlaylistRefresh = {
 };
 
 const activePlaylistRefreshes = new Map<string, ActivePlaylistRefresh>();
+const PLAYLIST_BROWSER_COMPATIBILITY_USER_AGENT =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+    'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+    'Chrome/137.0.0.0 Safari/537.36';
 
 /**
  * Fetches and parses a playlist from a URL
@@ -55,24 +59,26 @@ async function fetchPlaylistFromUrl(
     sender: WebContents,
     title?: string
 ): Promise<Playlist> {
-    const response = await sender.session.fetch(url, {
-        headers: {
-            Accept: [
-                'audio/x-mpegurl',
-                'application/vnd.apple.mpegurl',
-                'application/x-mpegURL',
-                'text/plain',
-                '*/*',
-            ].join(', '),
-            'User-Agent': getBrowserUserAgent(sender.getUserAgent()),
-        },
-    });
+    let response = await fetchPlaylistResponse(
+        url,
+        sender,
+        getBrowserUserAgent(sender.getUserAgent())
+    );
+    let rawPlaylist = await response.text();
+
+    if (isCloudflareChallenge(response, rawPlaylist)) {
+        response = await fetchPlaylistResponse(
+            url,
+            sender,
+            PLAYLIST_BROWSER_COMPATIBILITY_USER_AGENT
+        );
+        rawPlaylist = await response.text();
+    }
 
     if (!response.ok) {
         throw new Error(`Request failed with status code ${response.status}`);
     }
 
-    const rawPlaylist = await response.text();
     assertM3uResponse(rawPlaylist, response.headers.get('content-type'));
     const parsedPlaylist = normalizeParsedPlaylistMetadata(
         rawPlaylist,
@@ -93,6 +99,33 @@ async function fetchPlaylistFromUrl(
     );
 
     return playlistObject;
+}
+
+function fetchPlaylistResponse(
+    url: string,
+    sender: WebContents,
+    userAgent: string
+): Promise<Response> {
+    return sender.session.fetch(url, {
+        headers: {
+            Accept: [
+                'audio/x-mpegurl',
+                'application/vnd.apple.mpegurl',
+                'application/x-mpegURL',
+                'text/plain',
+                '*/*',
+            ].join(', '),
+            'User-Agent': userAgent,
+        },
+    });
+}
+
+function isCloudflareChallenge(response: Response, body: string): boolean {
+    return (
+        response.headers.get('cf-mitigated') === 'challenge' ||
+        (response.status === 403 &&
+            /(?:challenge-platform|just a moment|cf_chl_opt)/i.test(body))
+    );
 }
 
 function getBrowserUserAgent(userAgent: string): string {

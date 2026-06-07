@@ -129,10 +129,12 @@ keep their existing paths. Shaka is dynamically imported, configures
 `drm.clearKeys`, and is the sole MediaSource/EME owner for the DRM item. The
 DRM media component uses native controls and exposes audio and subtitle
 selectors only when the manifest provides those tracks.
-Shaka feeds subtitle cues to both its UI text displayer and the browser-native
-text displayer. Inline playback uses the UI layer so fragmented TTML/STPP,
-including embedded PNG subtitle images, remains supported. Video-element
-fullscreen and picture-in-picture switch visibility to the native text track.
+Inline playback uses Shaka's UI text displayer so fragmented TTML/STPP,
+including embedded PNG subtitle images, remains supported. When the video
+enters native fullscreen or picture-in-picture, the adapter replaces the text
+displayer with Shaka's native implementation; Shaka then reloads the selected
+text stream into the video element. Leaving native presentation restores the
+UI text displayer.
 
 Shaka teardown always unloads the current asset, unregisters request filters,
 and destroys the player. Diagnostic details contain only Shaka category/code
