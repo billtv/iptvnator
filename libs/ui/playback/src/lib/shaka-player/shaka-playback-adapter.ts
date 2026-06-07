@@ -30,19 +30,13 @@ export interface ShakaTextTrack {
 type ShakaPlayerInstance = InstanceType<
     Awaited<ReturnType<typeof loadShakaPlayer>>['Player']
 >;
-type ShakaNamespace = Awaited<ReturnType<typeof loadShakaPlayer>>;
 
 export class ShakaPlaybackAdapter {
     private player: ShakaPlayerInstance | null = null;
     private video: HTMLVideoElement | null = null;
-    private shaka: ShakaNamespace | null = null;
-    private nativeTextPresentation: boolean | null = null;
     private requestFilter:
         | ((type: number, request: { headers: Record<string, string> }) => void)
         | null = null;
-    private readonly handlePresentationChange = () => {
-        this.syncTextDisplayer();
-    };
 
     async attach(
         video: HTMLVideoElement,
@@ -54,13 +48,14 @@ export class ShakaPlaybackAdapter {
 
         await this.destroy();
         const shaka = await loadShakaPlayer();
-        this.shaka = shaka;
         this.video = video;
         const player = new shaka.Player(video);
         this.player = player;
         player.setVideoContainer(videoContainer);
-        this.addPresentationListeners(video);
-        this.syncTextDisplayer();
+        player.configure({
+            textDisplayFactory: (textPlayer: ShakaPlayerInstance) =>
+                new shaka.text.UITextDisplayer(textPlayer),
+        });
     }
 
     async load(request: ShakaPlaybackRequest): Promise<void> {
@@ -189,13 +184,8 @@ export class ShakaPlaybackAdapter {
     async destroy(): Promise<void> {
         this.removeRequestFilter();
         const player = this.player;
-        if (this.video) {
-            this.removePresentationListeners(this.video);
-        }
         this.player = null;
         this.video = null;
-        this.shaka = null;
-        this.nativeTextPresentation = null;
         await player?.destroy();
     }
 
@@ -209,77 +199,8 @@ export class ShakaPlaybackAdapter {
             ?.unregisterRequestFilter(this.requestFilter);
         this.requestFilter = null;
     }
-
-    private addPresentationListeners(video: HTMLVideoElement): void {
-        video.ownerDocument.addEventListener(
-            'fullscreenchange',
-            this.handlePresentationChange
-        );
-        for (const eventName of [
-            'enterpictureinpicture',
-            'leavepictureinpicture',
-            'webkitbeginfullscreen',
-            'webkitendfullscreen',
-            'webkitpresentationmodechanged',
-        ]) {
-            video.addEventListener(eventName, this.handlePresentationChange);
-        }
-    }
-
-    private removePresentationListeners(video: HTMLVideoElement): void {
-        video.ownerDocument.removeEventListener(
-            'fullscreenchange',
-            this.handlePresentationChange
-        );
-        for (const eventName of [
-            'enterpictureinpicture',
-            'leavepictureinpicture',
-            'webkitbeginfullscreen',
-            'webkitendfullscreen',
-            'webkitpresentationmodechanged',
-        ]) {
-            video.removeEventListener(eventName, this.handlePresentationChange);
-        }
-    }
-
-    private syncTextDisplayer(): void {
-        if (!this.player || !this.video || !this.shaka) {
-            return;
-        }
-
-        const useNative = isNativeVideoPresentation(this.video);
-        if (this.nativeTextPresentation === useNative) {
-            return;
-        }
-
-        this.nativeTextPresentation = useNative;
-        const shaka = this.shaka;
-        this.player.configure({
-            textDisplayFactory: useNative
-                ? (player: ShakaPlayerInstance) =>
-                      new shaka.text.NativeTextDisplayer(player)
-                : (player: ShakaPlayerInstance) =>
-                      new shaka.text.UITextDisplayer(player),
-        });
-    }
 }
 
 function isBrowserSettableHeader(name: string): boolean {
     return !['user-agent', 'referer', 'origin'].includes(name.toLowerCase());
-}
-
-function isNativeVideoPresentation(video: HTMLVideoElement): boolean {
-    const document = video.ownerDocument;
-    const webkitVideo = video as HTMLVideoElement & {
-        webkitDisplayingFullscreen?: boolean;
-        webkitPresentationMode?: string;
-    };
-
-    return (
-        document.fullscreenElement === video ||
-        document.pictureInPictureElement === video ||
-        webkitVideo.webkitDisplayingFullscreen === true ||
-        (webkitVideo.webkitPresentationMode !== undefined &&
-            webkitVideo.webkitPresentationMode !== 'inline')
-    );
 }

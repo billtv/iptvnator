@@ -1,7 +1,13 @@
-<video #videoPlayer autoplay controls playsinline></video>
+<video
+    #videoPlayer
+    autoplay
+    controls
+    controlsList="nofullscreen"
+    playsinline
+></video>
 
-@if (audioTracks.length > 1 || textTracks.length > 0) {
-    <div class="shaka-track-controls">
+<div class="shaka-track-controls">
+    @if (audioTracks.length > 1 || textTracks.length > 0) {
         @if (audioTracks.length > 1) {
             <label>
                 <span>Audio</span>
@@ -32,5 +38,16 @@
                 </select>
             </label>
         }
-    </div>
-}
+    }
+
+    <button
+        type="button"
+        class="shaka-presentation-button"
+        aria-label="Toggle fullscreen"
+        [attr.aria-pressed]="isFullscreen"
+        title="Fullscreen with subtitles"
+        (click)="toggleFullscreen()"
+    >
+        Full
+    </button>
+</div>

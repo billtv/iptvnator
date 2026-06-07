@@ -1,5 +1,6 @@
 import {
     Component,
+    ChangeDetectorRef,
     ElementRef,
     EventEmitter,
     Input,
@@ -44,9 +45,13 @@ export class ShakaPlayerComponent implements OnInit, OnChanges, OnDestroy {
     textTracks: ShakaTextTrack[] = [];
     selectedAudioTrack = 0;
     selectedTextTrack = -1;
+    isFullscreen = false;
 
     private readonly adapter = new ShakaPlaybackAdapter();
     private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+    private readonly changeDetector = inject(ChangeDetectorRef);
+    private readonly presentationDocument =
+        this.host.nativeElement.ownerDocument;
     private initialized = false;
     private loadGeneration = 0;
 
@@ -59,19 +64,35 @@ export class ShakaPlayerComponent implements OnInit, OnChanges, OnDestroy {
     };
 
     private readonly handlePlaying = () => this.playbackIssue.emit(null);
+    private readonly handleTracksChanged = () => {
+        this.refreshTracks();
+    };
     private readonly handleShakaError = (event: Event) => {
         const detail = (event as CustomEvent).detail;
         this.playbackIssue.emit(
             classifyShakaPlaybackIssue(detail, this.playback.streamUrl)
         );
     };
-
+    private readonly handleFullscreenChange = () => {
+        this.isFullscreen =
+            this.presentationDocument.fullscreenElement ===
+            this.host.nativeElement;
+        this.changeDetector.detectChanges();
+    };
     async ngOnInit(): Promise<void> {
         const video = this.videoPlayer.nativeElement;
         video.addEventListener('timeupdate', this.handleTimeUpdate);
         video.addEventListener('playing', this.handlePlaying);
+        this.presentationDocument.addEventListener(
+            'fullscreenchange',
+            this.handleFullscreenChange
+        );
         await this.adapter.attach(video, this.host.nativeElement);
         this.adapter.addEventListener('error', this.handleShakaError);
+        this.adapter.addEventListener(
+            'trackschanged',
+            this.handleTracksChanged
+        );
         this.initialized = true;
         await this.loadPlayback();
     }
@@ -97,12 +118,30 @@ export class ShakaPlayerComponent implements OnInit, OnChanges, OnDestroy {
         this.adapter.selectTextTrack(id < 0 ? null : id);
     }
 
+    async toggleFullscreen(): Promise<void> {
+        const host = this.host.nativeElement;
+        if (this.presentationDocument.fullscreenElement === host) {
+            await this.presentationDocument.exitFullscreen();
+            return;
+        }
+
+        await host.requestFullscreen();
+    }
+
     async ngOnDestroy(): Promise<void> {
         this.loadGeneration++;
         const video = this.videoPlayer.nativeElement;
         video.removeEventListener('timeupdate', this.handleTimeUpdate);
         video.removeEventListener('playing', this.handlePlaying);
+        this.presentationDocument.removeEventListener(
+            'fullscreenchange',
+            this.handleFullscreenChange
+        );
         this.adapter.removeEventListener('error', this.handleShakaError);
+        this.adapter.removeEventListener(
+            'trackschanged',
+            this.handleTracksChanged
+        );
         await this.adapter.destroy();
     }
 
@@ -168,5 +207,6 @@ export class ShakaPlayerComponent implements OnInit, OnChanges, OnDestroy {
         if (!this.showCaptions) {
             this.adapter.selectTextTrack(null);
         }
+        this.changeDetector.detectChanges();
     }
 }

@@ -6,6 +6,11 @@
     background: #000;
 }
 
+:host:fullscreen {
+    width: 100vw;
+    height: 100vh;
+}
+
 video {
     width: 100%;
     height: 100%;
@@ -32,6 +37,23 @@ video {
     border-radius: 6px;
     background: rgb(0 0 0 / 72%);
     color: #fff;
+}
+
+.shaka-presentation-button {
+    min-width: 34px;
+    height: 28px;
+    padding: 0 7px;
+    border: 1px solid rgb(255 255 255 / 35%);
+    border-radius: 4px;
+    background: rgb(255 255 255 / 12%);
+    color: #fff;
+    cursor: pointer;
+    font: 600 11px/1 sans-serif;
+}
+
+.shaka-presentation-button:hover,
+.shaka-presentation-button:focus-visible {
+    background: rgb(255 255 255 / 24%);
 }
 
 label {

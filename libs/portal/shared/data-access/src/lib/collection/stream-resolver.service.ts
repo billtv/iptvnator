@@ -287,6 +287,8 @@ export class StreamResolverService {
             streamUrl: channel.url ?? '',
             title: channel.name,
             thumbnail: channel.tvg?.logo ?? null,
+            manifestType: channel.manifestType,
+            drm: channel.drm,
             headers: Object.keys(headers).length > 0 ? headers : undefined,
             userAgent,
             referer,

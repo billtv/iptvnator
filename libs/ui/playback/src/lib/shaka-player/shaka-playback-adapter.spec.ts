@@ -1,5 +1,4 @@
 const playerInstances: MockPlayer[] = [];
-const nativeTextDisplayers: MockTextDisplayer[] = [];
 const uiTextDisplayers: MockTextDisplayer[] = [];
 
 class MockTextDisplayer {
@@ -10,13 +9,6 @@ class MockTextDisplayer {
     isTextVisible = jest.fn(() => false);
     setTextVisibility = jest.fn();
     setTextLanguage = jest.fn();
-}
-
-class MockNativeTextDisplayer extends MockTextDisplayer {
-    constructor() {
-        super();
-        nativeTextDisplayers.push(this);
-    }
 }
 
 class MockUiTextDisplayer extends MockTextDisplayer {
@@ -62,7 +54,6 @@ jest.unstable_mockModule('shaka-player', () => ({
             },
         },
         text: {
-            NativeTextDisplayer: MockNativeTextDisplayer,
             UITextDisplayer: MockUiTextDisplayer,
         },
     },
@@ -71,7 +62,6 @@ jest.unstable_mockModule('shaka-player', () => ({
 describe('ShakaPlaybackAdapter', () => {
     beforeEach(() => {
         playerInstances.length = 0;
-        nativeTextDisplayers.length = 0;
         uiTextDisplayers.length = 0;
         installAll.mockClear();
     });
@@ -124,7 +114,7 @@ describe('ShakaPlaybackAdapter', () => {
         expect(video.volume).toBe(0.5);
     });
 
-    it('replaces the Shaka text displayer for native picture-in-picture', async () => {
+    it('uses the UI text displayer for every presentation surface', async () => {
         const { ShakaPlaybackAdapter } =
             await import('./shaka-playback-adapter');
         const adapter = new ShakaPlaybackAdapter();
@@ -133,56 +123,12 @@ describe('ShakaPlaybackAdapter', () => {
         container.appendChild(video);
         await adapter.attach(video, container);
 
-        const inlineFactory = playerInstances[0].configure.mock.calls[0][0]
+        const textDisplayFactory = playerInstances[0].configure.mock.calls[0][0]
             .textDisplayFactory as (player: MockPlayer) => MockTextDisplayer;
-        expect(inlineFactory(playerInstances[0])).toBeInstanceOf(
+        expect(textDisplayFactory(playerInstances[0])).toBeInstanceOf(
             MockUiTextDisplayer
         );
-
-        Object.defineProperty(document, 'pictureInPictureElement', {
-            configurable: true,
-            value: video,
-        });
-        video.dispatchEvent(new Event('enterpictureinpicture'));
-
-        const nativeFactory = playerInstances[0].configure.mock.calls[1][0]
-            .textDisplayFactory as (player: MockPlayer) => MockTextDisplayer;
-        expect(nativeFactory(playerInstances[0])).toBeInstanceOf(
-            MockNativeTextDisplayer
-        );
-
-        Object.defineProperty(document, 'pictureInPictureElement', {
-            configurable: true,
-            value: null,
-        });
-        video.dispatchEvent(new Event('leavepictureinpicture'));
-
-        const restoredFactory = playerInstances[0].configure.mock.calls[2][0]
-            .textDisplayFactory as (player: MockPlayer) => MockTextDisplayer;
-        expect(restoredFactory(playerInstances[0])).toBeInstanceOf(
-            MockUiTextDisplayer
-        );
-    });
-
-    it('uses native text tracks for WebKit native fullscreen', async () => {
-        const { ShakaPlaybackAdapter } =
-            await import('./shaka-playback-adapter');
-        const adapter = new ShakaPlaybackAdapter();
-        const video = document.createElement('video') as HTMLVideoElement & {
-            webkitDisplayingFullscreen?: boolean;
-        };
-        const container = document.createElement('div');
-        container.appendChild(video);
-        await adapter.attach(video, container);
-
-        video.webkitDisplayingFullscreen = true;
-        video.dispatchEvent(new Event('webkitbeginfullscreen'));
-
-        const nativeFactory = playerInstances[0].configure.mock.calls[1][0]
-            .textDisplayFactory as (player: MockPlayer) => MockTextDisplayer;
-        expect(nativeFactory(playerInstances[0])).toBeInstanceOf(
-            MockNativeTextDisplayer
-        );
+        expect(playerInstances[0].configure).toHaveBeenCalledTimes(1);
     });
 
     it('rejects explicit ClearKey metadata without a valid key', async () => {

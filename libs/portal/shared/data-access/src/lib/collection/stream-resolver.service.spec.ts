@@ -6,10 +6,7 @@ import {
 } from '@iptvnator/portal/xtream/data-access';
 import { StalkerSessionService } from '@iptvnator/portal/stalker/data-access';
 import { EpgRuntimeBridgeService } from '@iptvnator/epg/data-access';
-import {
-    DataService,
-    PlaylistsService,
-} from '@iptvnator/services';
+import { DataService, PlaylistsService } from '@iptvnator/services';
 import { Playlist } from '@iptvnator/shared/interfaces';
 import { UnifiedCollectionItem } from '@iptvnator/portal/shared/util';
 import {
@@ -90,6 +87,14 @@ describe('StreamResolverService', () => {
                             },
                             radio: 'false',
                             epgParams: '',
+                            manifestType: 'dash',
+                            drm: {
+                                type: 'clearkey',
+                                clearKeys: {
+                                    '00112233445566778899aabbccddeeff':
+                                        'ffeeddccbbaa99887766554433221100',
+                                },
+                            },
                         },
                     ],
                 },
@@ -130,6 +135,10 @@ describe('StreamResolverService', () => {
                 userAgent: 'IPTVnator',
                 referer: 'https://ref.example.com',
                 origin: 'https://origin.example.com',
+                manifestType: 'dash',
+                drm: expect.objectContaining({
+                    type: 'clearkey',
+                }),
             }),
         });
         expect(detail.epgPrograms).toHaveLength(1);
