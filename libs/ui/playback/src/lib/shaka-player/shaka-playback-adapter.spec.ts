@@ -1,4 +1,30 @@
 const playerInstances: MockPlayer[] = [];
+const nativeTextDisplayers: MockTextDisplayer[] = [];
+const uiTextDisplayers: MockTextDisplayer[] = [];
+
+class MockTextDisplayer {
+    configure = jest.fn();
+    remove = jest.fn(() => true);
+    append = jest.fn();
+    destroy = jest.fn(async () => undefined);
+    isTextVisible = jest.fn(() => false);
+    setTextVisibility = jest.fn();
+    setTextLanguage = jest.fn();
+}
+
+class MockNativeTextDisplayer extends MockTextDisplayer {
+    constructor() {
+        super();
+        nativeTextDisplayers.push(this);
+    }
+}
+
+class MockUiTextDisplayer extends MockTextDisplayer {
+    constructor() {
+        super();
+        uiTextDisplayers.push(this);
+    }
+}
 
 class MockPlayer {
     static isBrowserSupported = jest.fn(() => true);
@@ -35,12 +61,18 @@ jest.unstable_mockModule('shaka-player', () => ({
                 RequestType: { LICENSE: 2 },
             },
         },
+        text: {
+            NativeTextDisplayer: MockNativeTextDisplayer,
+            UITextDisplayer: MockUiTextDisplayer,
+        },
     },
 }));
 
 describe('ShakaPlaybackAdapter', () => {
     beforeEach(() => {
         playerInstances.length = 0;
+        nativeTextDisplayers.length = 0;
+        uiTextDisplayers.length = 0;
         installAll.mockClear();
     });
 
@@ -73,6 +105,9 @@ describe('ShakaPlaybackAdapter', () => {
         const player = playerInstances[0];
         expect(installAll).toHaveBeenCalledTimes(1);
         expect(player.setVideoContainer).toHaveBeenCalledWith(container);
+        expect(player.configure).toHaveBeenNthCalledWith(1, {
+            textDisplayFactory: expect.any(Function),
+        });
         expect(player.configure).toHaveBeenCalledWith({
             drm: {
                 clearKeys: request.drm.clearKeys,
@@ -87,6 +122,50 @@ describe('ShakaPlaybackAdapter', () => {
         expect(player.unload).toHaveBeenCalledTimes(2);
         expect(player.destroy).toHaveBeenCalledTimes(1);
         expect(video.volume).toBe(0.5);
+    });
+
+    it('switches subtitle output between the UI overlay and native presentation tracks', async () => {
+        const { ShakaPlaybackAdapter } =
+            await import('./shaka-playback-adapter');
+        const adapter = new ShakaPlaybackAdapter();
+        const video = document.createElement('video');
+        const container = document.createElement('div');
+        container.appendChild(video);
+        await adapter.attach(video, container);
+
+        const textDisplayFactory = playerInstances[0].configure.mock.calls[0][0]
+            .textDisplayFactory as () => {
+            setTextVisibility(visible: boolean): void;
+            destroy(): Promise<void>;
+        };
+        const displayer = textDisplayFactory();
+        displayer.setTextVisibility(true);
+
+        expect(uiTextDisplayers[0].setTextVisibility).toHaveBeenLastCalledWith(
+            true
+        );
+        expect(
+            nativeTextDisplayers[0].setTextVisibility
+        ).toHaveBeenLastCalledWith(false);
+
+        Object.defineProperty(document, 'pictureInPictureElement', {
+            configurable: true,
+            value: video,
+        });
+        video.dispatchEvent(new Event('enterpictureinpicture'));
+
+        expect(
+            nativeTextDisplayers[0].setTextVisibility
+        ).toHaveBeenLastCalledWith(true);
+        expect(uiTextDisplayers[0].setTextVisibility).toHaveBeenLastCalledWith(
+            false
+        );
+
+        await displayer.destroy();
+        Object.defineProperty(document, 'pictureInPictureElement', {
+            configurable: true,
+            value: null,
+        });
     });
 
     it('rejects explicit ClearKey metadata without a valid key', async () => {

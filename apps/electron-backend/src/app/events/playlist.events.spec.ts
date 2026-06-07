@@ -14,8 +14,12 @@ type IpcHandler = (event: MockIpcEvent, ...args: unknown[]) => Promise<unknown>;
 
 type MockIpcEvent = {
     sender: {
+        getUserAgent: jest.Mock<string, []>;
         isDestroyed: jest.Mock<boolean, []>;
         send: jest.Mock;
+        session: {
+            fetch: jest.Mock;
+        };
     };
 };
 
@@ -28,7 +32,7 @@ type MockWorker = {
 };
 
 const mockRegisteredHandlers = new Map<string, IpcHandler>();
-const mockAxiosGet = jest.fn();
+const mockSessionFetch = jest.fn();
 const mockShowOpenDialog = jest.fn();
 const mockShowSaveDialog = jest.fn();
 const mockReadFile = jest.fn();
@@ -52,13 +56,6 @@ jest.mock('electron', () => ({
         handle: jest.fn((channel: string, handler: IpcHandler) => {
             mockRegisteredHandlers.set(channel, handler);
         }),
-    },
-}));
-
-jest.mock('axios', () => ({
-    __esModule: true,
-    default: {
-        get: (...args: unknown[]) => mockAxiosGet(...args),
     },
 }));
 
@@ -125,8 +122,15 @@ function createPlaylist(overrides: Partial<Playlist> = {}): Playlist {
 function createIpcEvent(): MockIpcEvent {
     return {
         sender: {
+            getUserAgent: jest.fn(
+                () =>
+                    'Mozilla/5.0 Chrome/137.0.0.0 Electron/36.0.0 IPTVnator/0.20.0'
+            ),
             isDestroyed: jest.fn(() => false),
             send: jest.fn(),
+            session: {
+                fetch: mockSessionFetch,
+            },
         },
     };
 }
@@ -150,7 +154,7 @@ describe('playlist IPC events', () => {
         jest.resetModules();
         mockRegisteredHandlers.clear();
         mockWorkerInstances.length = 0;
-        mockAxiosGet.mockReset();
+        mockSessionFetch.mockReset();
         mockShowOpenDialog.mockReset();
         mockShowSaveDialog.mockReset();
         mockReadFile.mockReset();
@@ -183,7 +187,11 @@ describe('playlist IPC events', () => {
             url: 'https://example.test/remote.m3u',
         });
 
-        mockAxiosGet.mockResolvedValue({ data: '#EXTM3U' });
+        mockSessionFetch.mockResolvedValue(
+            new Response('#EXTM3U', {
+                headers: { 'content-type': 'audio/x-mpegurl' },
+            })
+        );
         mockParse.mockReturnValue(parsedPlaylist);
         mockGetFilenameFromUrl.mockReturnValue('remote.m3u');
         mockCreatePlaylistObject.mockReturnValue(playlist);
@@ -193,9 +201,14 @@ describe('playlist IPC events', () => {
             'https://example.test/remote.m3u'
         );
 
-        expect(mockAxiosGet).toHaveBeenCalledWith(
+        expect(mockSessionFetch).toHaveBeenCalledWith(
             'https://example.test/remote.m3u',
-            { httpsAgent: expect.any(Object) }
+            {
+                headers: {
+                    Accept: expect.stringContaining('audio/x-mpegurl'),
+                    'User-Agent': 'Mozilla/5.0 Chrome/137.0.0.0',
+                },
+            }
         );
         expect(mockParse).toHaveBeenCalledWith('#EXTM3U');
         expect(mockCreatePlaylistObject).toHaveBeenCalledWith(
@@ -205,6 +218,24 @@ describe('playlist IPC events', () => {
             'URL'
         );
         expect(result).toEqual(playlist);
+    });
+
+    it('rejects HTML challenge pages instead of parsing them as playlists', async () => {
+        mockSessionFetch.mockResolvedValue(
+            new Response('<!DOCTYPE html><title>Just a moment...</title>', {
+                headers: { 'content-type': 'text/html; charset=UTF-8' },
+            })
+        );
+
+        await expect(
+            getHandler('fetch-playlist-by-url')(
+                createIpcEvent(),
+                'https://example.test/challenge.m3u'
+            )
+        ).rejects.toThrow(
+            'The playlist URL returned an HTML page instead of M3U content'
+        );
+        expect(mockParse).not.toHaveBeenCalled();
     });
 
     it('returns null when the open playlist dialog is cancelled', async () => {
@@ -283,7 +314,11 @@ describe('playlist IPC events', () => {
         ];
         const parsedPlaylist = { items: [{ name: 'Updated' }] };
 
-        mockAxiosGet.mockResolvedValue({ data: '#EXTM3U url' });
+        mockSessionFetch.mockResolvedValue(
+            new Response('#EXTM3U url', {
+                headers: { 'content-type': 'audio/x-mpegurl' },
+            })
+        );
         mockReadFile.mockResolvedValue('#EXTM3U file');
         mockParse.mockReturnValue(parsedPlaylist);
         mockGetFilenameFromUrl.mockReturnValue('list.m3u');
@@ -326,9 +361,13 @@ describe('playlist IPC events', () => {
                 title: 'Updated file playlist',
             }),
         ]);
-        expect(mockAxiosGet).toHaveBeenCalledWith(
+        expect(mockSessionFetch).toHaveBeenCalledWith(
             'https://example.test/list.m3u',
-            { httpsAgent: expect.any(Object) }
+            expect.objectContaining({
+                headers: expect.objectContaining({
+                    'User-Agent': 'Mozilla/5.0 Chrome/137.0.0.0',
+                }),
+            })
         );
         expect(mockReadFile).toHaveBeenCalledWith(
             '/playlists/local.m3u',

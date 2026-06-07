@@ -3,7 +3,6 @@
  * between the frontend to the electron backend.
  */
 
-import axios from 'axios';
 import { app, dialog, ipcMain, WebContents } from 'electron';
 import { parse } from 'iptv-playlist-parser';
 import {
@@ -36,8 +35,6 @@ export default class PlaylistEvents {
     }
 }
 
-const https = require('https');
-
 type ActivePlaylistRefresh = {
     reject: (reason?: unknown) => void;
     resolve: (value: Playlist) => void;
@@ -55,15 +52,31 @@ const activePlaylistRefreshes = new Map<string, ActivePlaylistRefresh>();
  */
 async function fetchPlaylistFromUrl(
     url: string,
+    sender: WebContents,
     title?: string
 ): Promise<Playlist> {
-    const agent = new https.Agent({
-        rejectUnauthorized: false,
+    const response = await sender.session.fetch(url, {
+        headers: {
+            Accept: [
+                'audio/x-mpegurl',
+                'application/vnd.apple.mpegurl',
+                'application/x-mpegURL',
+                'text/plain',
+                '*/*',
+            ].join(', '),
+            'User-Agent': getBrowserUserAgent(sender.getUserAgent()),
+        },
     });
-    const result = await axios.get(url, { httpsAgent: agent });
+
+    if (!response.ok) {
+        throw new Error(`Request failed with status code ${response.status}`);
+    }
+
+    const rawPlaylist = await response.text();
+    assertM3uResponse(rawPlaylist, response.headers.get('content-type'));
     const parsedPlaylist = normalizeParsedPlaylistMetadata(
-        result.data,
-        parse(result.data)
+        rawPlaylist,
+        parse(rawPlaylist)
     );
 
     const extractedName = url && url.length > 1 ? getFilenameFromUrl(url) : '';
@@ -80,6 +93,31 @@ async function fetchPlaylistFromUrl(
     );
 
     return playlistObject;
+}
+
+function getBrowserUserAgent(userAgent: string): string {
+    return userAgent
+        .replace(/\sElectron\/[\d.]+/gi, '')
+        .replace(/\sIPTVnator\/[\d.]+/gi, '')
+        .trim();
+}
+
+function assertM3uResponse(
+    body: string,
+    contentType: string | null
+): void {
+    const normalizedBody = body.trimStart();
+    const normalizedContentType = contentType?.toLowerCase() ?? '';
+    if (
+        !normalizedBody ||
+        normalizedBody.startsWith('<!DOCTYPE html') ||
+        normalizedBody.startsWith('<html') ||
+        normalizedContentType.includes('text/html')
+    ) {
+        throw new Error(
+            'The playlist URL returned an HTML page instead of M3U content'
+        );
+    }
 }
 
 /**
@@ -165,7 +203,7 @@ function preserveAutoUpdatedPlaylistFields(
 
 ipcMain.handle('fetch-playlist-by-url', async (event, url, title?: string) => {
     try {
-        return await fetchPlaylistFromUrl(url, title);
+        return await fetchPlaylistFromUrl(url, event.sender, title);
     } catch (error) {
         console.error('Error fetching playlist:', error);
         throw error;
@@ -226,6 +264,7 @@ ipcMain.handle(AUTO_UPDATE_PLAYLISTS, async (event, playlists) => {
                 );
                 playlistObject = await fetchPlaylistFromUrl(
                     playlist.url,
+                    event.sender,
                     playlist.title
                 );
             } else if (playlist.filePath) {

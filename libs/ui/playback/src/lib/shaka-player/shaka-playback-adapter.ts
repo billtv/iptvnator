@@ -30,6 +30,108 @@ export interface ShakaTextTrack {
 type ShakaPlayerInstance = InstanceType<
     Awaited<ReturnType<typeof loadShakaPlayer>>['Player']
 >;
+type ShakaNamespace = Awaited<ReturnType<typeof loadShakaPlayer>>;
+type NativeTextDisplayer = InstanceType<
+    ShakaNamespace['text']['NativeTextDisplayer']
+>;
+type UiTextDisplayer = InstanceType<
+    ShakaNamespace['text']['UITextDisplayer']
+>;
+
+class PresentationTextDisplayer {
+    private readonly nativeDisplayer: NativeTextDisplayer;
+    private readonly uiDisplayer: UiTextDisplayer;
+    private textVisible = false;
+
+    private readonly handlePresentationChange = () => {
+        this.syncVisibility();
+    };
+
+    constructor(
+        shaka: ShakaNamespace,
+        player: ShakaPlayerInstance,
+        private readonly video: HTMLVideoElement
+    ) {
+        this.nativeDisplayer = new shaka.text.NativeTextDisplayer(player);
+        this.uiDisplayer = new shaka.text.UITextDisplayer(player);
+        this.video.ownerDocument.addEventListener(
+            'fullscreenchange',
+            this.handlePresentationChange
+        );
+        this.video.addEventListener(
+            'enterpictureinpicture',
+            this.handlePresentationChange
+        );
+        this.video.addEventListener(
+            'leavepictureinpicture',
+            this.handlePresentationChange
+        );
+    }
+
+    configure(
+        config: Parameters<NativeTextDisplayer['configure']>[0]
+    ): void {
+        this.nativeDisplayer.configure(config);
+        this.uiDisplayer.configure(config);
+    }
+
+    remove(start: number, end: number): boolean {
+        const nativeResult = this.nativeDisplayer.remove(start, end);
+        const uiResult = this.uiDisplayer.remove(start, end);
+        return nativeResult && uiResult;
+    }
+
+    append(cues: Parameters<NativeTextDisplayer['append']>[0]): void {
+        this.nativeDisplayer.append(cues);
+        this.uiDisplayer.append(cues);
+    }
+
+    async destroy(): Promise<void> {
+        this.video.ownerDocument.removeEventListener(
+            'fullscreenchange',
+            this.handlePresentationChange
+        );
+        this.video.removeEventListener(
+            'enterpictureinpicture',
+            this.handlePresentationChange
+        );
+        this.video.removeEventListener(
+            'leavepictureinpicture',
+            this.handlePresentationChange
+        );
+        await Promise.all([
+            this.nativeDisplayer.destroy(),
+            this.uiDisplayer.destroy(),
+        ]);
+    }
+
+    isTextVisible(): boolean {
+        return this.textVisible;
+    }
+
+    setTextVisibility(visible: boolean): void {
+        this.textVisible = visible;
+        this.syncVisibility();
+    }
+
+    setTextLanguage(language: string): void {
+        this.nativeDisplayer.setTextLanguage(language);
+        this.uiDisplayer.setTextLanguage(language);
+    }
+
+    private syncVisibility(): void {
+        const document = this.video.ownerDocument;
+        const nativePresentation =
+            document.fullscreenElement === this.video ||
+            document.pictureInPictureElement === this.video;
+        this.nativeDisplayer.setTextVisibility(
+            this.textVisible && nativePresentation
+        );
+        this.uiDisplayer.setTextVisibility(
+            this.textVisible && !nativePresentation
+        );
+    }
+}
 
 export class ShakaPlaybackAdapter {
     private player: ShakaPlayerInstance | null = null;
@@ -49,8 +151,13 @@ export class ShakaPlaybackAdapter {
         await this.destroy();
         const shaka = await loadShakaPlayer();
         this.video = video;
-        this.player = new shaka.Player(video);
-        this.player.setVideoContainer(videoContainer);
+        const player = new shaka.Player(video);
+        this.player = player;
+        player.setVideoContainer(videoContainer);
+        player.configure({
+            textDisplayFactory: () =>
+                new PresentationTextDisplayer(shaka, player, video),
+        });
     }
 
     async load(request: ShakaPlaybackRequest): Promise<void> {
